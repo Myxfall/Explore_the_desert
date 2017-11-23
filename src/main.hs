@@ -14,14 +14,23 @@ matrix = [  [Water, Water, Water],
             [Water, Water, Water]]
 matrixB = [  [Tile True Water True, Tile False Water False, Tile False Water False],
             [Tile False Lava False, Tile False Water False, Tile False Lava False],
-            [Tile False Water False, Tile False Water False, Tile False Water False]]
+            [Tile False Water False, Tile False Water False, Tile False Portal False]]
 tileTest = Tile True (Desert False) False
 
 mat = fromLists matrixB
 lineofsigth = 1
+probList = [(10, Desert True), (25, Water), (25, Lava), (5, Portal), (35, Desert False)]
 -- ----------------------------------------
+
+
 main :: IO()
-main = game pl mat
+main = do
+    gen <- getStdGen
+
+    let (listField, newGen) = initFieldInList probList gen
+    let gameField = fromList 5 5 listField
+    game pl (discoverTiles gameField (xCoord pl, yCoord pl) lineofsigth)
+    --TODO: Send new gen
 
 
 game :: Player -> Matrix Tile -> IO()
@@ -58,15 +67,3 @@ game player field = do
 
 
     return ()
-
--- Test function
-test :: String -> IO()
-test msg = do
-    putStrLn $ "Votre message est " ++  msg
-
-printBoard :: [[Integer]] -> String
-printBoard a = show (a!!0!!0) ++ show (a!!0!!1) ++ show (a!!0!!2)
-
-printBoardF :: [[Integer]] -> String
-printBoardF [] = ""
-printBoardF (x:xs) = show x ++ "\n" ++ (printBoardF xs)

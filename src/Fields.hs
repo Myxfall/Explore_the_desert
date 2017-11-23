@@ -3,23 +3,42 @@ module Fields where
 import Player
 
 import Data.Matrix
+import System.Random
+
 
 type Position = (Int,Int)
 type LineOfSight = Int
-data TileType = Desert Bool | Water | Lava deriving (Show)
+data TileType = Desert Bool | Water | Lava | Portal deriving (Show)
 data Tile = Tile {  isRevealed :: Bool,
                     typeTile :: TileType,
                     playerOn :: Bool}
---data TileB = IsRevealed Bool | TypeTile TileType | PlayerOn Bool
 
 --instance field show
 instance Show Tile where
     show (Tile False _ _) = "*"
-    show (Tile True Water False) = "W" -- ~
-    show (Tile True Lava False) = "L"
-    show (Tile True (Desert False) False) = "d"
-    show (Tile True (Desert True) False) = "D"
+    show (Tile True Water False) = "~" -- ~
+    show (Tile True Lava False) = "!"
+    show (Tile True (Desert False) False) = "."
+    show (Tile True (Desert True) False) = "€"
+    show (Tile True Portal False) = "O"
     show (Tile True _ True) = "P"
+
+-- TODO: change this
+randomWeapon :: [(Double, TileType)] -> StdGen -> (TileType, StdGen)
+randomWeapon chanceList seed = (weapChoice, newSeed)
+    where (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
+          weapChoice = choisit chanceList rand
+          choisit [(prob, weap)] _ = weap
+          choisit ((prob, weap):xs) rand
+            | rand <= prob = weap
+            | otherwise = choisit xs $ rand - prob
+
+initFieldInList :: [(Double, TileType)] -> StdGen -> ([Tile], StdGen)
+initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomWeapon probList seed) True ], seed)
+    where generate 1 (list, seed) = (list, seed)
+          generate counter (list, seed) = generate (counter-1) (list ++ [ Tile False (fst $ randomWeapon probList seed) False ], (snd $ randomWeapon probList seed))
+
+
 
 -- Function that takes the field and the player updated and returns the updated
 -- field
