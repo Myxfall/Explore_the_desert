@@ -8,7 +8,6 @@ import Control.Monad
 import Data.Matrix
 
 -- ---------- EXECUTION TEST PART ----------
-pl = Player 10 15 0 1 1
 matrix = [  [Water, Water, Water],
             [Lava, Water, Lava],
             [Water, Water, Water]]
@@ -19,15 +18,29 @@ tileTest = Tile True (Desert False) False
 
 mat = fromLists matrixB
 lineofsigth = 1
-probList = [(10, Desert True), (25, Water), (25, Lava), (5, Portal), (35, Desert False)]
+probList = [(10, Desert True), (25, Water), (25, Lava), (5, Portal), (20, Desert False)]
 -- ----------------------------------------
 
+-- USER PARAMETERS
+s = 1 -- Line of sight
+m = 15 -- Maximum of water
+g = 999 -- initial Seed
+t = fromIntegral 10 -- % desert contains a treasure
+w = fromIntegral 25 -- % Water tile generation
+p = fromIntegral 5 -- % Portal tile generation
+l = fromIntegral 25 -- % Lava tile generation without lava adjacent
+ll = fromIntegral 50 -- % Lava tile generation with lava adjacent
+
+pl = Player m m 0 1 1 -- Initial Player
+
+probListStandard = [(w, Water), (p, Portal), (l, Lava), ((100 - w - p - l) * (1 - (t/100)), Desert False), ((100 - w - p - l) * (t/100), Desert True)]
+probListLavaLac = [(w, Water), (p, Portal), (ll, Lava), ((100 - w - p - l) * (1 - (t/100)), Desert False), ((100 - w - p - l) * (t/100), Desert True)]
 
 main :: IO()
 main = do
-    gen <- getStdGen
-
-    let (listField, newGen) = initFieldInList probList gen
+    gen <- getStdGen -- TODO: mkStdGen
+    putStrLn $ show $ fst $  probListStandard!!4
+    let (listField, newGen) = initFieldInList probListStandard gen
     let gameField = fromList 5 5 listField
     game pl (discoverTiles gameField (xCoord pl, yCoord pl) lineofsigth)
     --TODO: Send new gen

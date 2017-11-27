@@ -8,6 +8,7 @@ import System.Random
 
 type Position = (Int,Int)
 type LineOfSight = Int
+type Prob = [(Double, TileType)]
 data TileType = Desert Bool | Water | Lava | Portal deriving (Show)
 data Tile = Tile {  isRevealed :: Bool,
                     typeTile :: TileType,
@@ -23,20 +24,28 @@ instance Show Tile where
     show (Tile True Portal False) = "O"
     show (Tile True _ True) = "P"
 
--- TODO: change this
-randomWeapon :: [(Double, TileType)] -> StdGen -> (TileType, StdGen)
-randomWeapon chanceList seed = (weapChoice, newSeed)
-    where (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
-          weapChoice = choisit chanceList rand
-          choisit [(prob, weap)] _ = weap
-          choisit ((prob, weap):xs) rand
-            | rand <= prob = weap
-            | otherwise = choisit xs $ rand - prob
+-- -- TODO: change this
+-- randomWeapon :: [(Double, TileType)] -> StdGen -> (TileType, StdGen)
+-- randomWeapon chanceList seed = (weapChoice, newSeed)
+--     where (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
+--           weapChoice = choisit chanceList rand
+--           choisit [(prob, weap)] _ = weap
+--           choisit ((prob, weap):xs) rand
+--             | rand <= prob = weap
+--             | otherwise = choisit xs $ rand - prob
 
-initFieldInList :: [(Double, TileType)] -> StdGen -> ([Tile], StdGen)
-initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomWeapon probList seed) True ], seed)
+-- WARNING: if total % not 100: problems
+randomChooseTile :: Prob -> StdGen -> (TileType, StdGen)
+randomChooseTile probList seed = (generateTile probList rand, newSeed)
+    where (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
+          generateTile ((probTile, tile):xs) rand
+            | rand <= probTile = tile
+            | otherwise = generateTile xs (rand - probTile)
+
+initFieldInList :: Prob -> StdGen -> ([Tile], StdGen)
+initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomChooseTile probList seed) True ], seed)
     where generate 1 (list, seed) = (list, seed)
-          generate counter (list, seed) = generate (counter-1) (list ++ [ Tile False (fst $ randomWeapon probList seed) False ], (snd $ randomWeapon probList seed))
+          generate counter (list, seed) = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile probList seed) False ], (snd $ randomChooseTile probList seed))
 
 
 
@@ -51,8 +60,13 @@ updatedTest field x y = setElem (Tile True (typeTile $ getElem x y field) False)
 -- TODO: discover around the player
 --      fun :: Player -> Matrix Tile -> Int (line of sigth) -> Matrix Tile
 --      First try, cross around player (x, y+1) (x+1, y) (x, y-1) (x-1, y)
+--      Try with "where" and match direction
 discoverTiles :: Matrix Tile -> Position -> LineOfSight -> Matrix Tile
-discoverTiles field (x,y) n = rightDiscover (downDiscover field (x,y) n n) (x,y) n n
+discoverTiles field (x,y) n = right
+    where right = rightDiscover down (x,y) n n
+          down  = downDiscover left (x,y) n n
+          left = leftDiscover up (x,y) n n
+          up = upDiscover field (x,y) n n
 
 rightDiscover :: Matrix Tile -> Position -> LineOfSight -> Int -> Matrix Tile
 rightDiscover field (x,y) n 0 = field
@@ -78,6 +92,9 @@ upDiscover field (x,y) n counter = if x == 1
                                    then field
                                    else upDiscover (setElem (Tile True (typeTile $ getElem (x-1) y field) False) (x-counter,y) field) (x,y) n (counter-1)
 
+-- TODO: Extend Matrix, new discover tiles
+-- extendField :: Matrix Tile -> Matrix Tile
+-- extendField field
 
 -- lineField :: [Tile] -> Player -> Int -> Int -> [Tile]
 -- lineField (c:[]) player x y = if xCoord player == x && yCoord player y
