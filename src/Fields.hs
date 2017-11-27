@@ -42,6 +42,7 @@ randomChooseTile probList seed = (generateTile probList rand, newSeed)
             | rand <= probTile = tile
             | otherwise = generateTile xs (rand - probTile)
 
+-- TODO: change. The first two are same always (two same seed for two calls random first)
 initFieldInList :: Prob -> StdGen -> ([Tile], StdGen)
 initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomChooseTile probList seed) True ], seed)
     where generate 1 (list, seed) = (list, seed)
@@ -93,8 +94,9 @@ upDiscover field (x,y) n counter = if x == 1
                                    else upDiscover (setElem (Tile True (typeTile $ getElem (x-1) y field) False) (x-counter,y) field) (x,y) n (counter-1)
 
 -- TODO: Extend Matrix, new discover tiles
--- extendField :: Matrix Tile -> Matrix Tile
--- extendField field
+-- extendField :: Matrix Tile -> Prob -> Prob -> [Tile]
+-- extendField field normalProbList lavaProbList = genOne $ toLists field
+--     where genOne fieldLists = fieldLists!!
 
 -- lineField :: [Tile] -> Player -> Int -> Int -> [Tile]
 -- lineField (c:[]) player x y = if xCoord player == x && yCoord player y
