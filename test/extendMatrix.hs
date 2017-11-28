@@ -5,7 +5,7 @@ import System.Random
 data Weapon = Rock | Paper | Scissor deriving (Show, Eq)
 type Prob = [(Double, Weapon)]
 
-mat = [Rock, Paper, Scissor, Rock, Rock, Paper, Rock, Rock, Scissor]
+mat = [Rock, Paper, Scissor, Rock, Rock, Paper, Rock, Paper, Scissor]
 list = [(33.33, Rock), (33.33, Paper), (33.33, Scissor)]
 
 matB = fromList 3 3 mat
@@ -25,6 +25,7 @@ extendField field normalProbList seed =  newMatrix
           newMatrix = fieldLists ++ [newLine]
           generate 0 (list, seed) = (list, seed)
           generate counter (list, seed) -- TODO: also check left if i > 0
+            | counter /= (length fieldLists) && (list!!(length fieldLists - (counter + 1))) == Rock = generate (counter-1) (list ++ [ Rock ], (seed))
             | (fieldLists!!(length fieldLists-1)!!(length fieldLists - counter)) == Rock = generate (counter-1) (list ++ [ Rock ], (seed))
             | otherwise = generate (counter-1) (list ++ [ fst $ randomChooseTile normalProbList seed ], (snd $ randomChooseTile normalProbList seed))
 
