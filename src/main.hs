@@ -28,8 +28,8 @@ g = 999 -- initial Seed
 t = fromIntegral 10 -- % desert contains a treasure
 w = fromIntegral 25 -- % Water tile generation
 p = fromIntegral 5 -- % Portal tile generation
-l = fromIntegral 25 -- % Lava tile generation without lava adjacent
-ll = fromIntegral 50 -- % Lava tile generation with lava adjacent
+l = fromIntegral 10 -- % Lava tile generation without lava adjacent
+ll = fromIntegral 70 -- % Lava tile generation with lava adjacent
 
 pl = Player m m 0 1 1 -- Initial Player
 
@@ -39,10 +39,16 @@ probListLavaLac = [(w, Water), (p, Portal), (ll, Lava), ((100 - w - p - l) * (1 
 main :: IO()
 main = do
     gen <- getStdGen -- TODO: mkStdGen
-    putStrLn $ show $ fst $  probListStandard!!4
+
     let (listField, newGen) = initFieldInList probListStandard gen
     let gameField = fromList 5 5 listField
-    game pl (discoverTiles gameField (xCoord pl, yCoord pl) lineofsigth)
+
+    -- TEST EXTEND FUNCTION --
+    let tEST_FIELD = fromLists $ fst $ extendField gameField probListStandard probListLavaLac gen
+    --                      --
+
+    -- Launch game
+    game pl (discoverTiles tEST_FIELD (xCoord pl, yCoord pl) lineofsigth)
     --TODO: Send new gen
 
 
@@ -50,6 +56,8 @@ game :: Player -> Matrix Tile -> IO()
 game player field = do
     -- Ask for the several params
     -- TODO: use argv
+
+    -- TODO: player case verification : WATER - LAVA - TREASURE
 
     --putStrLn $ "Game starts !"
     putStrLn $ show field

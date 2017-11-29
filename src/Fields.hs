@@ -9,7 +9,7 @@ import System.Random
 type Position = (Int,Int)
 type LineOfSight = Int
 type Prob = [(Double, TileType)]
-data TileType = Desert Bool | Water | Lava | Portal deriving (Show)
+data TileType = Desert Bool | Water | Lava | Portal deriving (Show, Eq)
 data Tile = Tile {  isRevealed :: Bool,
                     typeTile :: TileType,
                     playerOn :: Bool}
@@ -92,6 +92,28 @@ upDiscover field (x,y) n 0 = field
 upDiscover field (x,y) n counter = if x == 1
                                    then field
                                    else upDiscover (setElem (Tile True (typeTile $ getElem (x-1) y field) False) (x-counter,y) field) (x,y) n (counter-1)
+
+extendField :: Matrix Tile -> Prob -> Prob -> StdGen -> ([[Tile]], StdGen)
+extendField field normalProbList lavaProbList seed =  (newMatrix, newSeed)
+   where (fieldLists, preSeed) = extendFieldBis field normalProbList lavaProbList seed
+         (newLine,newSeed) = generate (length fieldLists) ([], preSeed)
+         newMatrix = fieldLists ++ [newLine]
+         generate (-1) (list, seed) = (list, seed)
+         generate counter (list, seed)
+           | counter /= (length fieldLists) && typeTile (list!!(length fieldLists - (counter + 1))) == Lava = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile lavaProbList seed) False ], snd $ randomChooseTile lavaProbList seed)
+           | typeTile (fieldLists!!(length fieldLists-1)!!(length fieldLists - counter)) == Lava = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile lavaProbList seed) False ], snd $ randomChooseTile lavaProbList seed)
+           | otherwise = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile normalProbList seed) False ], snd $ randomChooseTile normalProbList seed)
+
+-- TODO: upper check
+extendFieldBis :: Matrix Tile -> Prob -> Prob -> StdGen -> ([[Tile]], StdGen)
+extendFieldBis field normalProbList lavaProbList seed = (newMatrix, newSeed)
+   where fieldLists = toLists field
+         (newMatrix, newSeed) = extendLoop (length fieldLists) ([], seed)
+         extendLoop 0 (list, seed) = (list, seed)
+         extendLoop counter (list, seed)
+           | typeTile (fieldLists!!(length fieldLists - counter)!!(length fieldLists - 1)) == Lava = extendLoop (counter-1) (list ++ [(fieldLists!!(length fieldLists - counter)) ++ [ Tile False (fst $ randomChooseTile lavaProbList seed) False ]], snd $ randomChooseTile lavaProbList seed)
+           | otherwise = extendLoop (counter-1) (list ++ [(fieldLists!!(length fieldLists - counter)) ++ [ Tile False (fst $ randomChooseTile normalProbList seed) False ]], snd $ randomChooseTile normalProbList seed)
+
 
 -- TODO: Extend Matrix, new discover tiles
 -- extendField :: Matrix Tile -> Prob -> Prob -> [Tile]

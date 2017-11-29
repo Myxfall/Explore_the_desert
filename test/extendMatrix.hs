@@ -5,7 +5,7 @@ import System.Random
 data Weapon = Rock | Paper | Scissor deriving (Show, Eq)
 type Prob = [(Double, Weapon)]
 
-mat = [Rock, Paper, Paper, Rock, Rock, Paper, Scissor, Paper, Paper]
+mat = [Rock, Paper, Rock, Rock, Rock, Paper, Scissor, Paper, Paper]
 list = [(33.33, Rock), (33.33, Paper), (33.33, Scissor)]
 
 matB = fromList 3 3 mat
@@ -17,14 +17,14 @@ main = do
     putStrLn $ show $ matB
     putStrLn $ show $ extendField matB list gen
     --putStrLn $ show $ extendFieldBis matB list gen
-    putStrLn $ show $ fromLists $ extendField matB list gen
+    putStrLn $ show $ fromLists $ extendField (matB) list gen
 
 
 -- TODO: last line need one tile more
 extendField :: Matrix Weapon -> Prob -> StdGen -> [[Weapon]]
 extendField field normalProbList seed =  newMatrix
-    where fieldLists = extendFieldBis field normalProbList seed
-          (newLine,newSeed) = generate (length fieldLists) ([], seed)
+    where (fieldLists, preSeed) = extendFieldBis field normalProbList seed
+          (newLine,newSeed) = generate (length fieldLists) ([], preSeed)
           newMatrix = fieldLists ++ [newLine]
           generate (-1) (list, seed) = (list, seed)
           generate counter (list, seed)
@@ -33,8 +33,8 @@ extendField field normalProbList seed =  newMatrix
             | otherwise = generate (counter-1) (list ++ [ fst $ randomChooseTile normalProbList seed ], (snd $ randomChooseTile normalProbList seed))
 
 -- TODO: upper check
-extendFieldBis :: Matrix Weapon -> Prob -> StdGen -> [[Weapon]]
-extendFieldBis field normalProbList seed = newMatrix
+extendFieldBis :: Matrix Weapon -> Prob -> StdGen -> ([[Weapon]], StdGen)
+extendFieldBis field normalProbList seed = (newMatrix, newSeed)
     where fieldLists = toLists field
           (newMatrix, newSeed) = extendLoop (length fieldLists) ([], seed)
           extendLoop 0 (list, seed) = (list, seed)
