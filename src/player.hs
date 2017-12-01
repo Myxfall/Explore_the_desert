@@ -8,7 +8,7 @@ data Player = Player { water :: Int,
             yCoord :: Int}
 
 instance Show Player where
-    show (Player 0 _ _ _ _) = "Player's dead"
+    --show (Player 0 _ _ _ _) = "Player's dead"
     show (Player instantWater maxWater score x y) = "Player in (" ++ show x ++ "," ++ show y ++  ") water: " ++ show instantWater ++ "/" ++ show maxWater ++ " treasure : " ++ show score
 
 type Water = Int
@@ -20,17 +20,17 @@ type Water = Int
 
 moveUp :: Player -> Player
 moveUp p@(Player _ _ _ 1 _) = p
-moveUp p@(Player a b c x y) = Player a b c (x-1) y
+moveUp p@(Player a b c x y) = Player (a-1) b c (x-1) y
 
 moveDown :: Player -> Player
-moveDown p@(Player a b c x y) = Player a b c (x+1) y
+moveDown p@(Player a b c x y) = Player (a-1) b c (x+1) y
 
 moveLeft :: Player -> Player
 moveLeft p@(Player _ _ _ _ 1) = p
-moveLeft p@(Player a b c x y) = Player a b c x (y-1)
+moveLeft p@(Player a b c x y) = Player (a-1) b c x (y-1)
 
 moverRight :: Player -> Player
-moverRight p@(Player a b c x y) = Player a b c x (y+1)
+moverRight p@(Player a b c x y) = Player (a-1) b c x (y+1)
 
 -- moveUp :: Player -> TileType -> Maybe (Player, TileType)
 -- moveUp p@(Player _ _ _ _ 0) f = Just (p, f)
@@ -49,8 +49,8 @@ moverRight p@(Player a b c x y) = Player a b c x (y+1)
 findTreasure :: Player -> Player
 findTreasure (Player water maxWater treasure x y) = Player water maxWater (treasure+1) x y
 
-findWater :: Player -> Water -> Player
-findWater (Player water maxWater treasure x y) waterFound = Player (water + waterFound) maxWater treasure x y
+findWater :: Player  -> Player
+findWater (Player water maxWater treasure x y) = Player maxWater maxWater treasure x y
 
 loseWater :: Player -> Water -> Player
 loseWater (Player water maxWater treasure x y) waterLose = Player (water - waterLose) maxWater treasure x y

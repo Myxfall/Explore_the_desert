@@ -51,6 +51,24 @@ main = do
     game pl (discoverTiles tEST_FIELD (xCoord pl, yCoord pl) lineofsigth)
     --TODO: Send new gen
 
+verificationState :: Player -> Matrix Tile -> IO()
+verificationState player field = do
+    putStrLn $ " "
+    if (water player == 0)
+        then do putStrLn $ "You died of thirst !"
+                putStrLn $ "End of the Game !"
+    else if (typeTile (getElem (xCoord player) (yCoord player) field) == Lava)
+        then do putStrLn $ "You died in LAVA !"
+                putStrLn $ "End of the Game !"
+    else if (typeTile (getElem (xCoord player) (yCoord player) field) == Portal)
+        then putStrLn $ "Congratz, you find a Portal !"
+    else if (typeTile (getElem (xCoord player) (yCoord player) field) == Water)
+        then do putStrLn $ "You find a stock of water"
+                game (findWater player) field
+    else if (typeTile (getElem (xCoord player) (yCoord player) field) == Desert True)
+        then do putStrLn $ "You find a treasure"
+                game (findTreasure player) field
+    else do game player field
 
 game :: Player -> Matrix Tile -> IO()
 game player field = do
@@ -58,8 +76,6 @@ game player field = do
     -- TODO: use argv
 
     -- TODO: player case verification : WATER - LAVA - TREASURE
-
-    --putStrLn $ "Game starts !"
     putStrLn $ show field
     putStrLn $ show player
 
@@ -79,10 +95,10 @@ game player field = do
     case moveDirection of
         -- "z" -> do let testUp = moveUp player
         --          game (testUp) (updateField field player (testUp))
-        "z" -> game up (discoveredField (updatedField up) (xCoord up, yCoord up))
-        "s" -> game down (discoveredField (updatedField down) (xCoord down, yCoord down))
-        "q" -> game left (discoveredField (updatedField left) (xCoord left, yCoord left))
-        "d" -> game right (discoveredField (updatedField right) (xCoord right, yCoord right))
+        "z" -> verificationState up (discoveredField (updatedField up) (xCoord up, yCoord up))
+        "s" -> verificationState down (discoveredField (updatedField down) (xCoord down, yCoord down))
+        "q" -> verificationState left (discoveredField (updatedField left) (xCoord left, yCoord left))
+        "d" -> verificationState right (discoveredField (updatedField right) (xCoord right, yCoord right))
         otherwise -> do putStrLn "----- Error : Please enter movement in zqsd -----"
                         game player field
 
