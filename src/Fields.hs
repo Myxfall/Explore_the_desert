@@ -5,6 +5,7 @@ import Player
 import Data.Matrix
 import System.Random
 
+nO_COMPASS = -99
 
 type Position = (Int,Int)
 type LineOfSight = Int
@@ -24,31 +25,22 @@ instance Show Tile where
     show (Tile True Portal False) = "O"
     show (Tile True _ True) = "P"
 
--- -- TODO: change this
--- randomWeapon :: [(Double, TileType)] -> StdGen -> (TileType, StdGen)
--- randomWeapon chanceList seed = (weapChoice, newSeed)
---     where (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
---           weapChoice = choisit chanceList rand
---           choisit [(prob, weap)] _ = weap
---           choisit ((prob, weap):xs) rand
---             | rand <= prob = weap
---             | otherwise = choisit xs $ rand - prob
-
 -- WARNING: if total % not 100: problems
+-- Take the list of probabilites and the seed and return one tileType with the new Seed
+-- Simple algorithm that matches one percentage of occurrence of tileType and one random number between 0 and 100
+-- It works with steps, the smallest numbers are for the first percentage of occurrence, the next for the others
 randomChooseTile :: Prob -> StdGen -> (TileType, StdGen)
 randomChooseTile probList seed = (generateTile probList rand, newSeed)
-    where (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
-          generateTile ((probTile, tile):xs) rand
+    where generateTile ((probTile, tile):xs) rand
             | rand <= probTile = tile
             | otherwise = generateTile xs (rand - probTile)
+          (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
 
 -- TODO: change. The first two are same always (two same seed for two calls random first)
 initFieldInList :: Prob -> StdGen -> ([Tile], StdGen)
 initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomChooseTile probList seed) True ], seed)
     where generate 1 (list, seed) = (list, seed)
           generate counter (list, seed) = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile probList seed) False ], (snd $ randomChooseTile probList seed))
-
-
 
 -- Function that takes the field and the player updated and returns the updated
 -- field
@@ -113,6 +105,73 @@ extendFieldBis field normalProbList lavaProbList seed = (newMatrix, newSeed)
          extendLoop counter (list, seed)
            | typeTile (fieldLists!!(length fieldLists - counter)!!(length fieldLists - 1)) == Lava = extendLoop (counter-1) (list ++ [(fieldLists!!(length fieldLists - counter)) ++ [ Tile False (fst $ randomChooseTile lavaProbList seed) False ]], snd $ randomChooseTile lavaProbList seed)
            | otherwise = extendLoop (counter-1) (list ++ [(fieldLists!!(length fieldLists - counter)) ++ [ Tile False (fst $ randomChooseTile normalProbList seed) False ]], snd $ randomChooseTile normalProbList seed)
+
+-- TODO: compass - 2 versions voisin l
+-- TODO: play with position and not with actual type Tile
+-- TODO: If position used, append in list of used positions
+-- TODO: Une liste pour tous les voisins
+-- concat $ map getNeighbour [(1,1), (2,2)] -> [(2,1),(1,2),(0,1),(1,0),(3,2),(2,3),(1,2),(2,1)]
+-- TODO: need to avoid lava and find water (delete lavaTile in neighbours list)
+-- TODO: return 3 paramether (try to remember wich one is found with typle of BOOL, pattern match when all are TRUE)
+-- ----------   COMPAS FUNCTIONS    ----------
+-- compass :: Matrix Tile -> Position -> Int
+-- compass field pos = launch
+--     where launch = check (getNeighbour field pos) [pos] [] 1
+--           check _ _ _ 50 = nO_COMPASS
+--           check [] checkedList nextNeighbour res = check (deleteUsedPositions (concat $ map (getNeighbour field) nextNeighbour) checkedList) checkedList [] (res+1)
+--           check ((x, y):xs) checkedList nextNeighbour res
+--             | typeTile (getElem x y field) == Water = res
+--             | otherwise = check xs (checkedList ++ [(x, y)]) (nextNeighbour ++ [(x, y)]) res
+
+
+compass :: Matrix Tile -> Position -> (Int, Int, Int)
+compass field pos = launch
+    where launch = check (getNeighbour field pos) [pos] [] (1,1,1) (False, False, False)
+          check _ _ _ res@(100, _, _) _ = res
+          check _ _ _ res@(_, 100, _) _ = res
+          check _ _ _ res@(_, _, 100) _ = res
+          check _ _ _ stepF (True, True, True) = stepF
+          check [] checkedList nextNeighbour (sW, sT, sP) ifFound@(ifW, ifT, ifP) = check (deleteUsedPositions (concat $ map (getNeighbour field) nextNeighbour) checkedList) checkedList [] (if ifW then sW else sW+1, if ifT then sT else sT+1, if ifP then sP else sP+1) ifFound
+          check ((x, y):xs) checkedList nextNeighbour res ifFound@(ifW, ifT, ifP)
+            | typeTile (getElem x y field) == Water = check xs (checkedList ++ [(x, y)]) (nextNeighbour ++ [(x, y)]) res (True, ifT, ifP)
+            | typeTile (getElem x y field) == Desert True = check xs (checkedList ++ [(x, y)]) (nextNeighbour ++ [(x, y)]) res (ifW, True, ifP)
+            | typeTile (getElem x y field) == Portal = check xs (checkedList ++ [(x, y)]) (nextNeighbour ++ [(x, y)]) res (ifW, ifT, True)
+            | otherwise = check xs (checkedList ++ [(x, y)]) (nextNeighbour ++ [(x, y)]) res ifFound
+
+
+-- Takes the list of neighbours and removes neighbours who are lava
+deleteLavaNeighbour :: [Position] -> Matrix Tile -> [Position]
+deleteLavaNeighbour neighboursPos field = loop neighboursPos field []
+    where loop [] field newList = newList
+          loop ((x, y):xs) field newList
+            | typeTile (getElem x y field) == Lava = loop xs field newList
+            | otherwise = loop xs field (newList ++ [(x, y)])
+
+-- return the positions of the neighbours of the actual position
+getNeighbour :: Matrix Tile -> Position -> [Position]
+getNeighbour field pos = deleteLavaNeighbour (getList pos) field
+    where getList (1, 1) = [(1, 2), (2, 1)]
+          getList (1, y)
+            | y == ncols field = [(2, y), (1, y-1)]
+            | otherwise = [(2, y), (1, y-1), (1, y+1)]
+          getList (x, 1)
+            | x == ncols field = [(x, 2), (x-1, 1)]
+            | otherwise = [(x, 2), (x-1, 1), (x+1, 1)]
+          getList (x, y)
+            | x == nrows field && y == ncols field = [(x-1, y), (x,y-1)]
+            | x == nrows field = [(x, y+1), (x-1, y), (x,y-1)]
+            | y == ncols field = [(x+1, y), (x-1, y), (x,y-1)]
+            | otherwise = [(x+1, y), (x, y+1), (x-1, y), (x,y-1)]
+
+-- Get the list of neighbours and the list of already checked positions
+-- return list of positions of neighbours without the already used
+deleteUsedPositions :: [Position] -> [Position] -> [Position]
+deleteUsedPositions neighboursPos usedPos = checkUsed neighboursPos []
+    where checkUsed [] newList = newList
+          checkUsed (x:xs) newList
+            | x `elem` usedPos = checkUsed xs newList
+            | otherwise = checkUsed xs (newList ++ [x])
+-- ----------                       ----------
 
 
 -- TODO: Extend Matrix, new discover tiles

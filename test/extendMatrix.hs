@@ -4,21 +4,40 @@ import System.Random
 
 data Weapon = Rock | Paper | Scissor deriving (Show, Eq)
 type Prob = [(Double, Weapon)]
+type Position = (Int, Int)
 
-mat = [Rock, Paper, Rock, Rock, Rock, Paper, Scissor, Paper, Paper]
-list = [(33.33, Rock), (33.33, Paper), (33.33, Scissor)]
-
-matB = fromList 3 3 mat
+pos = [(1,1), (1,2), (2,1), (2,2)]
+used = [(2,2), (1,1)]
+mat = [[1,2,3], [4,5,6], [7,8,9]]
 
 main :: IO ()
 main = do
-    gen <- getStdGen
+        putStrLn $ show mat
+        putStrLn $ show $ getNeighbour (1,1)
+        --putStrLn $ show $ deleteUsedPositions pos used
 
-    putStrLn $ show $ matB
-    putStrLn $ show $ extendField matB list gen
-    --putStrLn $ show $ extendFieldBis matB list gen
-    putStrLn $ show $ fromLists $ extendField (matB) list gen
 
+
+-- ----------   COMPAS FUNCTIONS    ----------
+
+-- return the positions of the neighbours of the actual position
+-- TODO: if neighbour positions already used ?
+getNeighbour :: Position -> [Position]
+getNeighbour pos@(1, 1) = [(1, 2), (2, 1)]
+getNeighbour pos@(1, y) = [(2, y), (1, y+1), (1,y-1)]
+getNeighbour pos@(x, 1) = [(x+1, 1), (x, 2), (x-1, 1)]
+getNeighbour pos@(x, y) = [(x+1, y), (x, y+1), (x-1, y), (x,y-1)]
+
+-- Get the list of neighbours and the list of already checked positions
+-- return list of positions of neighbours without the already used
+deleteUsedPositions :: [Position] -> [Position] -> [Position]
+deleteUsedPositions neighboursPos usedPos = checkUsed neighboursPos []
+    where checkUsed [] newList = newList
+          checkUsed (x:xs) newList
+            | x `elem` usedPos = checkUsed xs newList
+            | otherwise = checkUsed xs (newList ++ [x])
+
+-- ----------                       ----------
 
 -- TODO: last line need one tile more
 extendField :: Matrix Weapon -> Prob -> StdGen -> [[Weapon]]
