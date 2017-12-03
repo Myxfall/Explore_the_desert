@@ -1,11 +1,12 @@
+-- Maximilien Romain
+-- 0543411
+
 module Fields where
 
 import Player
 
 import Data.Matrix
 import System.Random
-
-nO_COMPASS = -99
 
 type Position = (Int,Int)
 type LineOfSight = Int
@@ -27,18 +28,18 @@ instance Show Tile where
 
 -- WARNING: if total % not 100: problems
 -- Take the list of probabilites and the seed and return one tileType with the new Seed
--- Simple algorithm that matches one percentage of occurrence of tileType and one random number between 0 and 100
+-- Simple algorithm that matches one percentage of occurrence of tileType with one random number between 0 and 100
 -- It works with steps, the smallest numbers are for the first percentage of occurrence, the next for the others
 randomChooseTile :: Prob -> StdGen -> (TileType, StdGen)
-randomChooseTile probList seed = (generateTile probList rand, newSeed)
-    where generateTile ((probTile, tile):xs) rand
-            | rand <= probTile = tile
-            | otherwise = generateTile xs (rand - probTile)
-          (rand, newSeed) = randomR (0,100) seed :: (Double, StdGen)
+randomChooseTile probList seed = (generateTile probList randNumber, newSeed)
+    where generateTile ((probTile, tile):xs) randNumber
+            | randNumber <= probTile = tile -- if randNumber matches the steps, return the tile. if we have a tile generated with 25%, a num between 1 to 25 generates the tile
+            | otherwise = generateTile xs (randNumber - probTile) -- otherwise check the next step
+          (randNumber, newSeed) = randomR (1,100) seed :: (Double, StdGen) -- 1 to 100 makes 100 possibilities. 0 to 100 makes 101 possibilities
 
--- TODO: change. The first two are same always (two same seed for two calls random first)
+-- Initialise the field for the beginning of the game
 initFieldInList :: Prob -> StdGen -> ([Tile], StdGen)
-initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomChooseTile probList seed) True ], seed)
+initFieldInList probList seed = generate 25 ([ Tile True (fst $ randomChooseTile probList seed) True ], snd $ randomChooseTile probList seed)
     where generate 1 (list, seed) = (list, seed)
           generate counter (list, seed) = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile probList seed) False ], (snd $ randomChooseTile probList seed))
 
@@ -50,10 +51,7 @@ updateField field player newPlayer = setElem (Tile True (typeTile (getElem (xCoo
 updatedTest :: Matrix Tile -> Int -> Int -> Matrix Tile
 updatedTest field x y = setElem (Tile True (typeTile $ getElem x y field) False)  (x,y) field
 
--- TODO: discover around the player
---      fun :: Player -> Matrix Tile -> Int (line of sigth) -> Matrix Tile
---      First try, cross around player (x, y+1) (x+1, y) (x, y-1) (x-1, y)
---      Try with "where" and match direction
+-- Discover with the line of sight the tiles around the player
 discoverTiles :: Matrix Tile -> Position -> LineOfSight -> Matrix Tile
 discoverTiles field (x,y) n = right
     where right = rightDiscover down (x,y) n n
@@ -64,27 +62,41 @@ discoverTiles field (x,y) n = right
 rightDiscover :: Matrix Tile -> Position -> LineOfSight -> Int -> Matrix Tile
 rightDiscover field (x,y) n 0 = field
 rightDiscover field (x,y) n counter = if y == ncols field
-                                      then field
-                                      else rightDiscover (setElem (Tile True (typeTile $ getElem x (y+1) field) False) (x,y+counter) field) (x,y) n (counter-1)
+                                        then field
+                                      else if y+counter > (ncols field)
+                                          then rightDiscover field (x,y) n ((ncols field) - y)
+                                      else rightDiscover (setElem (Tile True (typeTile $ getElem x (y+counter) field) False) (x,y+counter) field) (x,y) n (counter-1)
 
 downDiscover :: Matrix Tile -> Position -> LineOfSight -> Int -> Matrix Tile
 downDiscover field (x,y) n 0 = field
 downDiscover field (x,y) n counter = if x == nrows field
-                                     then field
-                                     else downDiscover (setElem (Tile True (typeTile $ getElem (x+1) y field) False) (x+counter,y) field) (x,y) n (counter-1)
+                                        then field
+                                     else if x+counter > (nrows field)
+                                         then downDiscover field (x,y) n ((nrows field) - x)
+                                     else downDiscover (setElem (Tile True (typeTile $ getElem (x+counter) y field) False) (x+counter,y) field) (x,y) n (counter-1)
 
 leftDiscover :: Matrix Tile -> Position -> LineOfSight -> Int -> Matrix Tile
 leftDiscover field (x,y) n 0 = field
 leftDiscover field (x,y) n counter = if y == 1
-                                     then field
-                                     else leftDiscover (setElem (Tile True (typeTile $ getElem x (y-1) field) False) (x,y-counter) field) (x,y) n (counter-1)
+                                        then field
+                                    else if (y - counter) <= 0
+                                        then field
+                                    else if y+counter > (ncols field)
+                                        then rightDiscover field (x,y) n ((ncols field) - y)
+                                     else leftDiscover (setElem (Tile True (typeTile $ getElem x (y-counter) field) False) (x,y-counter) field) (x,y) n (counter-1)
 
 upDiscover :: Matrix Tile -> Position -> LineOfSight -> Int -> Matrix Tile
 upDiscover field (x,y) n 0 = field
 upDiscover field (x,y) n counter = if x == 1
-                                   then field
-                                   else upDiscover (setElem (Tile True (typeTile $ getElem (x-1) y field) False) (x-counter,y) field) (x,y) n (counter-1)
+                                        then field
+                                    else if (x - counter) <= 0
+                                        then field
+                                   else if x+counter > (nrows field)
+                                       then downDiscover field (x,y) n ((nrows field) - x)
+                                   else upDiscover (setElem (Tile True (typeTile $ getElem (x-counter) y field) False) (x-counter,y) field) (x,y) n (counter-1)
 
+-- IMPORTANT NOTE: I could have used extendTo or setSize from Data.Matrix (I really could ...), but I discovered it too late and I didn't have time to change it.
+-- Two functions that takes the field and the list of probabilities and return the extended field
 extendField :: Matrix Tile -> Prob -> Prob -> StdGen -> ([[Tile]], StdGen)
 extendField field normalProbList lavaProbList seed =  (newMatrix, newSeed)
    where (fieldLists, preSeed) = extendFieldBis field normalProbList lavaProbList seed
@@ -96,7 +108,6 @@ extendField field normalProbList lavaProbList seed =  (newMatrix, newSeed)
            | typeTile (fieldLists!!(length fieldLists-1)!!(length fieldLists - counter)) == Lava = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile lavaProbList seed) False ], snd $ randomChooseTile lavaProbList seed)
            | otherwise = generate (counter-1) (list ++ [ Tile False (fst $ randomChooseTile normalProbList seed) False ], snd $ randomChooseTile normalProbList seed)
 
--- TODO: upper check
 extendFieldBis :: Matrix Tile -> Prob -> Prob -> StdGen -> ([[Tile]], StdGen)
 extendFieldBis field normalProbList lavaProbList seed = (newMatrix, newSeed)
    where fieldLists = toLists field
@@ -106,24 +117,7 @@ extendFieldBis field normalProbList lavaProbList seed = (newMatrix, newSeed)
            | typeTile (fieldLists!!(length fieldLists - counter)!!(length fieldLists - 1)) == Lava = extendLoop (counter-1) (list ++ [(fieldLists!!(length fieldLists - counter)) ++ [ Tile False (fst $ randomChooseTile lavaProbList seed) False ]], snd $ randomChooseTile lavaProbList seed)
            | otherwise = extendLoop (counter-1) (list ++ [(fieldLists!!(length fieldLists - counter)) ++ [ Tile False (fst $ randomChooseTile normalProbList seed) False ]], snd $ randomChooseTile normalProbList seed)
 
--- TODO: compass - 2 versions voisin l
--- TODO: play with position and not with actual type Tile
--- TODO: If position used, append in list of used positions
--- TODO: Une liste pour tous les voisins
--- concat $ map getNeighbour [(1,1), (2,2)] -> [(2,1),(1,2),(0,1),(1,0),(3,2),(2,3),(1,2),(2,1)]
--- TODO: need to avoid lava and find water (delete lavaTile in neighbours list)
--- TODO: return 3 paramether (try to remember wich one is found with typle of BOOL, pattern match when all are TRUE)
--- ----------   COMPAS FUNCTIONS    ----------
--- compass :: Matrix Tile -> Position -> Int
--- compass field pos = launch
---     where launch = check (getNeighbour field pos) [pos] [] 1
---           check _ _ _ 50 = nO_COMPASS
---           check [] checkedList nextNeighbour res = check (deleteUsedPositions (concat $ map (getNeighbour field) nextNeighbour) checkedList) checkedList [] (res+1)
---           check ((x, y):xs) checkedList nextNeighbour res
---             | typeTile (getElem x y field) == Water = res
---             | otherwise = check xs (checkedList ++ [(x, y)]) (nextNeighbour ++ [(x, y)]) res
-
-
+-- Takes the field and the player's position and return 3 integers : the number of steps to access the nearest water / treasure / portal
 compass :: Matrix Tile -> Position -> (Int, Int, Int)
 compass field pos = launch
     where launch = check (getNeighbour field pos) [pos] [] (1,1,1) (False, False, False)
@@ -171,30 +165,7 @@ deleteUsedPositions neighboursPos usedPos = checkUsed neighboursPos []
           checkUsed (x:xs) newList
             | x `elem` usedPos = checkUsed xs newList
             | otherwise = checkUsed xs (newList ++ [x])
--- ----------                       ----------
 
-
--- TODO: Extend Matrix, new discover tiles
--- extendField :: Matrix Tile -> Prob -> Prob -> [Tile]
--- extendField field normalProbList lavaProbList = genOne $ toLists field
---     where genOne fieldLists = fieldLists!!
-
--- lineField :: [Tile] -> Player -> Int -> Int -> [Tile]
--- lineField (c:[]) player x y = if xCoord player == x && yCoord player y
---                                   then unitField c True
---                                   else unitField c False
--- lineField (c:cs) player x y
---
--- unitField :: Tile -> Bool -> Tile
--- unitField tile player = if isRevealed tile
---                             then if player
---                                 then Tile True (typeTile tile) True
---                                 else Tile True (typeTile tile) False
---                             else Tile False (typeTile tile) False
---
-
--- Exemple records syntax
-test :: Tile -> String
-test l = if isRevealed l
-    then "IsRevealed True"
-    else "not"
+-- When you find a treasure, we need to replace the tile by an empty Desert
+treasureFound :: Matrix Tile -> Position -> Matrix Tile
+treasureFound field pos = setElem (Tile True (Desert False) True) pos field

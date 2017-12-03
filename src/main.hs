@@ -1,59 +1,64 @@
+-- Maximilien Romain
+-- 0543411
+
+-- The project runs with argv
+-- example of execution :
+-- ./main 2 15 900 10 25 5 10 70
+
 module Main where
 
 import Player
 import Fields
 
+import System.Environment
 import System.Random
 import Control.Monad
 import Data.Matrix
 
--- ---------- EXECUTION TEST PART ----------
-matrix = [  [Water, Water, Water],
-            [Lava, Water, Lava],
-            [Water, Water, Water]]
-matrixB = [  [Tile True Water True, Tile False Water False, Tile False Water False],
-            [Tile False Lava False, Tile False Water False, Tile False Lava False],
-            [Tile False Water False, Tile False Water False, Tile False Portal False]]
-tileTest = Tile True (Desert False) False
-
-mat = fromLists matrixB
-lineofsigth = 1
-probList = [(10, Desert True), (25, Water), (25, Lava), (10, Portal), (20, Desert False)]
--- ----------------------------------------
-
--- USER PARAMETERS
-s = 1 -- Line of sight
-m = 15 -- Maximum of water
-g = 900 -- initial Seed
-t = fromIntegral 10 -- % desert contains a treasure
-w = fromIntegral 25 -- % Water tile generation
-p = fromIntegral 5 -- % Portal tile generation
-l = fromIntegral 10 -- % Lava tile generation without lava adjacent
-ll = fromIntegral 70 -- % Lava tile generation with lava adjacent
-
-pl = Player m m 0 1 1 -- Initial Player
-
-probListStandard = [(w, Water), (p, Portal), (l, Lava), ((100 - w - p - l) * (1 - (t/100)), Desert False), ((100 - w - p - l) * (t/100), Desert True)]
-probListLavaLac = [(w, Water), (p, Portal), (ll, Lava), ((100 - w - p - l) * (1 - (t/100)), Desert False), ((100 - w - p - l) * (t/100), Desert True)]
-
 main :: IO()
 main = do
-    --gen <- getStdGen -- TODO: mkStdGen
 
-    let (listField, newGen) = initFieldInList probListStandard (mkStdGen g)
-    let gameField = fromList 5 5 listField
+    argv <- getArgs
+    -- fromIntegral : We need Double for the calcul of the probabilities
+    let s = fromIntegral $ read $ argv!!0  -- Line of sight
+    let m = fromIntegral $ read $ argv!!1 -- Maximum of water
+    let g = fromIntegral $ read $ argv!!2 -- initial Seed
+    let t = fromIntegral $ read $ argv!!3 -- % desert contains a treasure
+    let w = fromIntegral $ read $ argv!!5 -- % Water tile generation
+    let p = fromIntegral $ read $ argv!!5-- % Portal tile generation
+    let l = fromIntegral $ read $ argv!!6 -- % Lava tile generation without lava adjacent
+    let ll = fromIntegral $ read $ argv!!7 -- % Lava tile generation with lava adjacent
 
-    -- TEST EXTEND FUNCTION --
-    let tEST_FIELD = fromLists $ fst $ extendField gameField probListStandard probListLavaLac (mkStdGen g)
-    --                      --
+    let pl = Player m m 0 1 1 -- Initial Player
+    let a = checkArgv argv
+    putStrLn $ show a
 
-    -- Launch game
-    game pl (discoverTiles tEST_FIELD (xCoord pl, yCoord pl) lineofsigth) (mkStdGen g)
-    --TODO: Send new gen
+    if not $ checkArgv argv
+        then putStrLn $ "Error in the arguments"
+    else do let probListStandard = [(w, Water), (p, Portal), (l, Lava), ((100 - w - p - l) * (1 - (t/100)), Desert False), ((100 - w - p - l) * (t/100), Desert True)]
+            let probListLavaLac = [(w, Water), (p, Portal), (ll, Lava), ((100 - w - p - l) * (1 - (t/100)), Desert False), ((100 - w - p - l) * (t/100), Desert True)]
 
-verificationState :: Player -> Matrix Tile -> StdGen -> IO()
-verificationState player field seed = do
-    putStrLn $ " "
+            let (listField, newGen) = initFieldInList probListStandard (mkStdGen g)
+            let gameField = fromList 5 5 listField
+
+            -- Launch game
+            game pl (discoverTiles gameField (xCoord pl, yCoord pl) s) probListStandard probListLavaLac s (mkStdGen g)
+
+-- Check all the parameters
+checkArgv :: [String] -> Bool
+checkArgv list
+    | length list /= 8 = False
+    | otherwise = checkArgv' $ map (fromIntegral . read) list
+checkArgv' args@[s,m,g,t,w,p,l,ll]
+    | w + p + l > 100 = False
+    | w + p + ll > 100 = False
+    | t > 100 = False
+    | w < 0 || p < 0 || l < 0 || l < 0 || s < 0 || m < 0 || g < 0 || t < 0 = False
+    | otherwise = True
+
+verificationState :: Player -> Matrix Tile -> Prob -> Prob -> LineOfSight -> StdGen -> IO()
+verificationState player field probListStandard probListLavaLac lineofsigth seed = do
+
     if (water player == 0)
         then do putStrLn $ "You died of thirst !"
                 putStrLn $ "End of the Game !"
@@ -64,34 +69,28 @@ verificationState player field seed = do
         then putStrLn $ "Congratz, you find a Portal !"
     else if (typeTile (getElem (xCoord player) (yCoord player) field) == Water)
         then do putStrLn $ "You find a stock of water"
-                game (findWater player) field seed
+                game (findWater player) field probListStandard probListLavaLac lineofsigth seed
     else if (typeTile (getElem (xCoord player) (yCoord player) field) == Desert True)
         then do putStrLn $ "You find a treasure"
-                game (findTreasure player) field seed
+                game (findTreasure player) (treasureFound field (xCoord player, yCoord player)) probListStandard probListLavaLac lineofsigth seed
     else if (xCoord player + lineofsigth >= nrows field || yCoord player + lineofsigth >= ncols field)
-        then game player (fromLists $ fst $ extendField field probListStandard probListLavaLac seed) (snd $ extendField field probListStandard probListLavaLac seed)
-    else game player field seed
+        then game player (fromLists $ fst $ extendField field probListStandard probListLavaLac seed) probListStandard probListLavaLac lineofsigth (snd $ extendField field probListStandard probListLavaLac seed)
+    else game player field probListStandard probListLavaLac lineofsigth seed
 
-game :: Player -> Matrix Tile -> StdGen -> IO()
-game player field seed = do
-    -- Ask for the several params
-    -- TODO: use argv
+game :: Player -> Matrix Tile -> Prob -> Prob -> LineOfSight -> StdGen -> IO()
+game player field probListStandard probListLavaLac lineofsigth seed = do
 
-    -- TODO: player case verification : WATER - LAVA - TREASURE
     putStrLn $ show field
     putStrLn $ show player
 
     let inf@(waterSteps, treasureSteps, portalSteps) = compass field (xCoord player, yCoord player)
-    if (waterSteps == 100 || treasureSteps == 100 || portalSteps == 100)
-        then game player (fromLists $ fst $ extendField field probListStandard probListLavaLac seed) (snd $ extendField field probListStandard probListLavaLac seed)
-    else do putStrLn $ "There is water in " ++ show waterSteps ++ ", treasure in " ++ show treasureSteps ++ " and a portal in " ++ show portalSteps
+    if (waterSteps == 100 || treasureSteps == 100 || portalSteps == 100) -- if didnt find the element
+        then game player (fromLists $ fst $ extendField field probListStandard probListLavaLac seed) probListStandard probListLavaLac lineofsigth (snd $ extendField field probListStandard probListLavaLac seed)
+    else do putStrLn $ "There is water in " ++ show waterSteps ++ ", treasure in " ++ show treasureSteps ++ " and a portal in " ++ show portalSteps ++ " steps"
             putStrLn $ "Player's move : "
             moveDirection <- getLine
 
-            -- Azert movements : zqsd
-            -- TODO: try to return a function
-            -- TODO: try with "let" compute once, call twice
-            -- TODO: where with pattern matching for the selection function
+            -- Azerty movements : zqsd
             let up = moveUp player
                 down = moveDown player
                 right = moverRight player
@@ -99,14 +98,12 @@ game player field seed = do
                 updatedField newPlayer = updateField field player newPlayer
                 discoveredField newField pos = discoverTiles newField pos lineofsigth
             case moveDirection of
-                -- "z" -> do let testUp = moveUp player
-                --          game (testUp) (updateField field player (testUp))
-                "z" -> verificationState up (discoveredField (updatedField up) (xCoord up, yCoord up)) seed
-                "s" -> verificationState down (discoveredField (updatedField down) (xCoord down, yCoord down)) seed
-                "q" -> verificationState left (discoveredField (updatedField left) (xCoord left, yCoord left)) seed
-                "d" -> verificationState right (discoveredField (updatedField right) (xCoord right, yCoord right)) seed
-                otherwise -> do putStrLn "----- Error : Please enter movement in zqsd -----"
-                                game player field seed
+                "w" -> verificationState up (discoveredField (updatedField up) (xCoord up, yCoord up)) probListStandard probListLavaLac lineofsigth seed
+                "s" -> verificationState down (discoveredField (updatedField down) (xCoord down, yCoord down)) probListStandard probListLavaLac lineofsigth seed
+                "a" -> verificationState left (discoveredField (updatedField left) (xCoord left, yCoord left)) probListStandard probListLavaLac lineofsigth seed
+                "d" -> verificationState right (discoveredField (updatedField right) (xCoord right, yCoord right)) probListStandard probListLavaLac lineofsigth seed
+                otherwise -> do putStrLn "----- Error : Please enter movement in wasd -----"
+                                game player field probListStandard probListLavaLac lineofsigth seed
 
 
     return ()
